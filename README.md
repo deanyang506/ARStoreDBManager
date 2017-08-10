@@ -1,2 +1,2 @@
 # ARStoreDBManager
-pod 'ARStoreDBManager', git: 'https://github.com/idean506/ARStoreDBManager.git'
+pod 'ARStoreDBManager', git: 'https://github.com/deanyang506/ARStoreDBManager.git'
