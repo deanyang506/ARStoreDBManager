@@ -43,6 +43,8 @@ static BOOL checkTableName(NSString *tableName) {
     return YES;
 }
 
+#pragma mark - 自定义对象转JSON
+
 static id getObjectInternal(id obj);
 static NSDictionary *getObjectData(id obj);
 
@@ -54,20 +56,17 @@ static NSDictionary *getObjectData(id obj) {
         objc_property_t prop = props[i];
         NSString *propName = [NSString stringWithUTF8String:property_getName(prop)];
         id value = [obj valueForKey:propName];
-        if(value == nil) {
-            value = [NSNull null];
-        } else {
+        if(value) {
             value = getObjectInternal(value);
         }
         [dic setObject:value forKey:propName];
     }
+    free(props);
     return dic;
 }
 
 static id getObjectInternal(id obj) {
-    if([obj isKindOfClass:[NSString class]] || [obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSNull class]]) {
-        return obj;
-    }
+    
     if([obj isKindOfClass:[NSArray class]]) {
         NSArray *objarr = obj;
         NSMutableArray *arr = [NSMutableArray arrayWithCapacity:objarr.count];
@@ -76,6 +75,7 @@ static id getObjectInternal(id obj) {
         }
         return arr;
     }
+    
     if([obj isKindOfClass:[NSDictionary class]]) {
         NSDictionary *objdic = obj;
         NSMutableDictionary *dic = [NSMutableDictionary dictionaryWithCapacity:[objdic count]];
@@ -84,9 +84,17 @@ static id getObjectInternal(id obj) {
         }
         return dic;
     }
-    return getObjectData(obj);
+    
+    if ([obj respondsToSelector:@selector(copyWithZone:)]) {
+        NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
+        return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    } else {
+        return getObjectData(obj);
+    }
 }
 
+
+#pragma mark -
 
 @implementation ARStoreDBModel
 @end
@@ -163,8 +171,8 @@ static ARStoreDBManager *_storeDBManager;
         }
         
         NSMutableArray *identityArray = [NSMutableArray arrayWithCapacity:array.count];
-        for (id object in array) {
-            NSString* identity = (NSString *)[object valueForKey:identityKey];
+        for (id obj in array) {
+            NSString* identity = (NSString *)[obj valueForKeyPath:identityKey];
             [identityArray addObject:identity];
         }
         
@@ -328,8 +336,11 @@ static ARStoreDBManager *_storeDBManager;
         return [jsonArray copy];
     }
     
-    NSDictionary *dictObj = getObjectData(object);
-    NSData *data = [NSJSONSerialization dataWithJSONObject:dictObj options:0 error:nil];
+    id obj = object;
+    if (![object respondsToSelector:@selector(copyWithZone:)]) {
+        obj = getObjectData(object);
+    }
+    NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
     return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
@@ -342,7 +353,7 @@ static ARStoreDBManager *_storeDBManager;
     }
     
     NSDate *createdTime = [NSDate date];
-    NSString *sql = [NSString stringWithFormat:INSERT_ITEM_SQL, tableName];
+    NSString *sql = [NSString stringWithFormat:REPLACE_INTO_ITEM_SQL, tableName];
     
     id jsonObject = [self generatedJsonWithObject:objects];
 
@@ -464,7 +475,7 @@ static ARStoreDBManager *_storeDBManager;
 
 - (FMResultSet *)selectWithTableName:(NSString *)tableName whereId:(NSString *)whereId {
     
-    NSString *sql = [NSString stringWithFormat:SELECT_ID_SQL, whereId];
+    NSString *sql = [NSString stringWithFormat:SELECT_ID_SQL, tableName];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
@@ -476,7 +487,7 @@ static ARStoreDBManager *_storeDBManager;
 
 - (FMResultSet *)selectCountWithTableName:(NSString *)tableName {
     
-    NSString *sql = [NSString stringWithFormat:COUNT_ALL_SQL,tableName];
+    NSString *sql = [NSString stringWithFormat:COUNT_ALL_SQL, tableName];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
@@ -495,7 +506,7 @@ static ARStoreDBManager *_storeDBManager;
     
     id jsonObject = [self generatedJsonWithObject:object];
     if ([jsonObject isKindOfClass:[NSArray class]]) {
-        jsonObject = [((NSArray *)jsonObject) componentsJoinedByString:@","];
+        jsonObject = [NSString stringWithFormat:@"[%@]",[((NSArray *)jsonObject) componentsJoinedByString:@","]];
     }
     
     __block BOOL result;
