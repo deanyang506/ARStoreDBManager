@@ -67,6 +67,14 @@ static NSDictionary *getObjectData(id obj) {
 
 static id getObjectInternal(id obj) {
     
+    if ([obj isKindOfClass:[NSURL class]]) {
+        return ((NSURL*)obj).absoluteString;
+    }
+    
+    if([obj isKindOfClass:[NSString class]] || [obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSNull class]]) {
+        return obj;
+    }
+    
     if([obj isKindOfClass:[NSArray class]]) {
         NSArray *objarr = obj;
         NSMutableArray *arr = [NSMutableArray arrayWithCapacity:objarr.count];
@@ -85,12 +93,7 @@ static id getObjectInternal(id obj) {
         return dic;
     }
     
-    if ([obj respondsToSelector:@selector(copyWithZone:)]) {
-        NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
-        return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    } else {
-        return getObjectData(obj);
-    }
+    return getObjectData(obj);
 }
 
 
@@ -336,10 +339,7 @@ static ARStoreDBManager *_storeDBManager;
         return [jsonArray copy];
     }
     
-    id obj = object;
-    if (![object respondsToSelector:@selector(copyWithZone:)]) {
-        obj = getObjectData(object);
-    }
+    id obj = getObjectData(object);
     NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
     return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
