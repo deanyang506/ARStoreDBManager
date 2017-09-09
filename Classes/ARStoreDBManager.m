@@ -58,8 +58,8 @@ static NSDictionary *getObjectData(id obj) {
         id value = [obj valueForKey:propName];
         if(value) {
             value = getObjectInternal(value);
+            [dic setObject:value forKey:propName];
         }
-        [dic setObject:value forKey:propName];
     }
     free(props);
     return dic;
