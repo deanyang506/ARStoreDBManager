@@ -13,22 +13,23 @@ static NSString *const CREATE_TABLE_SQL =
 @"CREATE TABLE IF NOT EXISTS %@ ( \
 id TEXT UNIQUE  NOT NULL, \
 json TEXT  NOT NULL, \
-createdTime TEXT  NOT NULL\
+createdTime TEXT NOT NULL, \
+orderby TEXT \
 )";
 
 static NSString *const DEFAULT_TABLE = @"_DefaultTable";
 
 static NSString *const DROP_TABLE_SQL = @"DROP TABLE %@";
-static NSString *const INSERT_ITEM_SQL = @"INSERT INTO %@ (id, json, createdTime) VALUES(?, ?, ?)";
+static NSString *const INSERT_ITEM_SQL = @"INSERT INTO %@ (id, json, createdTime, orderby) VALUES(?, ?, ?)";
 
 // 尝试替换如果id存在，否则插入
-static NSString *const REPLACE_INTO_ITEM_SQL = @"REPLACE INTO %@ (id, json, createdTime) values (?, ?, ?)";
-static NSString *const UPDATE_ITEM_SQL = @"UPDATE %@ SET json=? WHERE id=?";
-static NSString *const QUERY_ITEM_SQL = @"SELECT json, createdTime FROM %@ WHERE id = ? LIMIT 1";
+static NSString *const REPLACE_INTO_ITEM_SQL = @"REPLACE INTO %@ (id, json, createdTime, orderby) values (?, ?, ?, ?)";
+static NSString *const UPDATE_ITEM_SQL = @"UPDATE %@ SET json=?,orderby=? WHERE id=?";
+static NSString *const QUERY_ITEM_SQL = @"SELECT json, createdTime, orderby FROM %@ WHERE id = ? LIMIT 1";
 static NSString *const SELECT_ALL_SQL = @"SELECT * FROM %@";
-static NSString *const SELECT_ALL_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY createdTime %@";
+static NSString *const SELECT_ALL_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY orderby %@";
 static NSString *const SELECT_PAGE_SQL = @"SELECT * FROM %@ LIMIT %@ OFFSET %@";
-static NSString *const SELECT_PAGE_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY %@ LIMIT %@ OFFSET %@";
+static NSString *const SELECT_PAGE_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY orderby %@ LIMIT %@ OFFSET %@";
 static NSString *const SELECT_ID_SQL = @"SELECT * FROM %@ WHERE id = ?";
 static NSString *const COUNT_ALL_SQL = @"SELECT COUNT(*) as num FROM %@";
 static NSString *const CLEAR_ALL_SQL = @"DELETE FROM %@";
@@ -150,11 +151,11 @@ static ARStoreDBManager *_storeDBManager;
     if (object == nil) {
         return [self deleteWithTableName:DEFAULT_TABLE identity:key];
     } else {
-        return [self replaceWithTableName:DEFAULT_TABLE identitiy:key object:object];
+        return [self replaceWithTableName:DEFAULT_TABLE identitiy:key object:object order:[NSNull null]];
     }
 }
 
-- (BOOL)setObjectWithKey:(NSString *)key object:(id)object identityKey:(NSString *)identityKey {
+- (BOOL)setObjectWithKey:(NSString *)key object:(id)object identityKey:(NSString *)identityKey orderKey:(NSString *)orderkey {
     
     if (!identityKey) {
         return NO;
@@ -174,13 +175,21 @@ static ARStoreDBManager *_storeDBManager;
         }
         
         NSMutableArray *identityArray = [NSMutableArray arrayWithCapacity:array.count];
+        NSMutableArray *orderArray = [NSMutableArray arrayWithCapacity:array.count];
+        
         for (id obj in array) {
             NSString* identity = (NSString *)[obj valueForKeyPath:identityKey];
             [identityArray addObject:identity];
+
+            if (orderkey) {
+                NSString *order = (NSString *)[obj valueForKeyPath:orderkey];
+                [orderArray addObject:order];
+            }
+            
         }
         
         if([self multiDeleteWithTableName:key identities:identityArray]) {
-            return [self insertWithTableName:key objects:array identities:identityArray];
+            return [self insertWithTableName:key objects:array identities:[identityArray copy] orders:[orderArray copy]];
         }
         
         return YES;
@@ -195,10 +204,16 @@ static ARStoreDBManager *_storeDBManager;
         
         if([self multiDeleteWithTableName:key identities:keys]) {
             NSMutableArray *values = [NSMutableArray array];
+            NSMutableArray *orders = [NSMutableArray array];
             for (id key in keys) {
-                [values addObject:dict[key]];
+                id obj = dict[key];
+                [values addObject:obj];
+                if (orderkey) {
+                    NSString *order = (NSString *)[obj valueForKeyPath:orderkey];
+                    [orders addObject:order];
+                }
             }
-            return [self insertWithTableName:key objects:values identities:keys];
+            return [self insertWithTableName:key objects:values identities:keys orders:orders];
         }
         
         return NO;
@@ -209,8 +224,13 @@ static ARStoreDBManager *_storeDBManager;
         if(identity == nil) {
             return NO;
         }
+        
+        NSString *order = [NSNull null];
+        if(orderkey) {
+            order = [object valueForKeyPath:orderkey];
+        }
             
-        return [self replaceWithTableName:key identitiy:identity object:object];
+        return [self replaceWithTableName:key identitiy:identity object:object order:order];
     }
     
     return NO;
@@ -230,12 +250,11 @@ static ARStoreDBManager *_storeDBManager;
     return 0;
 }
 
-- (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize dateOrder:(NSComparisonResult)dateOrder {
-    
+- (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize comparison:(NSComparisonResult)comparison {
     NSCAssert(checkTableName(key),@"");
     
     FMResultSet *resultSet = nil;
-    NSString *order = dateOrder == NSOrderedSame ? nil : (dateOrder == NSOrderedAscending ? @"ASC" : @"DESC");
+    NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
     pageIndex = MAX(0, pageIndex);
     
     if ([self isTableExists:key]) {
@@ -275,6 +294,7 @@ static ARStoreDBManager *_storeDBManager;
             }
             
             item.createdTime = [resultSet dateForColumn:@"createdTime"];
+            item.orderby = [resultSet stringForColumn:@"orderby"];
             [array addObject:item];
         }
         
@@ -346,7 +366,7 @@ static ARStoreDBManager *_storeDBManager;
 
 #pragma mark - insert
 
-- (BOOL)insertWithTableName:(NSString *)tableName objects:(NSArray<id> *)objects identities:(NSArray *)identities {
+- (BOOL)insertWithTableName:(NSString *)tableName objects:(NSArray<id> *)objects identities:(NSArray *)identities orders:(NSArray *)orders {
     
     if (objects.count != identities.count || identities.count == 0) {
         return NO;
@@ -362,7 +382,13 @@ static ARStoreDBManager *_storeDBManager;
         if ([jsonObject isKindOfClass:[NSArray class]]) {
             NSArray *jsonArray = (NSArray *)jsonObject;
             for (int i = 0; i < jsonArray.count; i++) {
-                result = [db executeUpdate:sql, identities[i], jsonArray[i], createdTime];
+                
+                NSString *order = [NSNull null];
+                if (orders.count > i) {
+                    order = orders[i];
+                }
+                
+                result = [db executeUpdate:sql, identities[i], jsonArray[i], createdTime, order];
                 if (!result) {
                     *rollback = YES;
                     return;
@@ -499,7 +525,7 @@ static ARStoreDBManager *_storeDBManager;
 
 #pragma mark - update / insert into
 
-- (BOOL)replaceWithTableName:(NSString *)tableName identitiy:(NSString *)identity object:(id)object {
+- (BOOL)replaceWithTableName:(NSString *)tableName identitiy:(NSString *)identity object:(id)object order:(NSString *)order {
     
     NSDate *createdTime = [NSDate date];
     NSString *sql = [NSString stringWithFormat:REPLACE_INTO_ITEM_SQL, tableName];
@@ -511,7 +537,7 @@ static ARStoreDBManager *_storeDBManager;
     
     __block BOOL result;
     [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql,identity,jsonObject,createdTime];
+        result = [db executeUpdate:sql,identity,jsonObject,createdTime, order];
     }];
     
     return result;
