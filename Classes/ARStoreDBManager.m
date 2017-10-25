@@ -180,7 +180,7 @@ static ARStoreDBManager *_storeDBManager;
         for (id obj in array) {
             NSString* identity = (NSString *)[obj valueForKeyPath:identityKey];
             [identityArray addObject:identity];
-
+            
             if (orderkey) {
                 NSString *order = (NSString *)[obj valueForKeyPath:orderkey];
                 [orderArray addObject:order];
@@ -229,7 +229,7 @@ static ARStoreDBManager *_storeDBManager;
         if(orderkey) {
             order = [object valueForKeyPath:orderkey];
         }
-            
+        
         return [self replaceWithTableName:key identitiy:identity object:object order:order];
     }
     
@@ -343,11 +343,15 @@ static ARStoreDBManager *_storeDBManager;
     [_dbQueue inDatabase:^(FMDatabase *db) {
         result = [db tableExists:tableName];
     }];
-
+    
     return result;
 }
 
 - (id)generatedJsonWithObject:(id)object {
+    
+    if ([object isKindOfClass:[NSString class]] || [object isKindOfClass:[NSNumber class]]) {
+        return object;
+    }
     
     if ([object isKindOfClass:[NSArray class]]) {
         NSMutableArray *jsonArray = [NSMutableArray new];
@@ -376,7 +380,7 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:REPLACE_INTO_ITEM_SQL, tableName];
     
     id jsonObject = [self generatedJsonWithObject:objects];
-
+    
     __block BOOL result;
     [_dbQueue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         if ([jsonObject isKindOfClass:[NSArray class]]) {
@@ -417,7 +421,7 @@ static ARStoreDBManager *_storeDBManager;
 }
 
 - (BOOL)multiDeleteWithTableName:(NSString *)tableName identities:(NSArray<NSString *> *)identities {
-
+    
     NSMutableArray *identityArray = [NSMutableArray arrayWithCapacity:identities.count];
     for (NSString *orign in identities) {
         [identityArray addObject:[NSString stringWithFormat:@"'%@'",orign]];
@@ -531,8 +535,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:REPLACE_INTO_ITEM_SQL, tableName];
     
     id jsonObject = [self generatedJsonWithObject:object];
-    if ([jsonObject isKindOfClass:[NSArray class]]) {
-        jsonObject = [NSString stringWithFormat:@"[%@]",[((NSArray *)jsonObject) componentsJoinedByString:@","]];
+    if ([jsonObject isKindOfClass:[NSArray class]] || [jsonObject isKindOfClass:[NSDictionary class]]) {
+        NSData *data = [NSJSONSerialization dataWithJSONObject:jsonObject options:0 error:nil];
+        jsonObject = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    } else {
+        return NO;
     }
     
     __block BOOL result;
