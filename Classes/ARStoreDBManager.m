@@ -349,7 +349,9 @@ static ARStoreDBManager *_storeDBManager;
 
 - (id)generatedJsonWithObject:(id)object {
     
-    if ([object isKindOfClass:[NSString class]] || [object isKindOfClass:[NSNumber class]]) {
+    if ([object isKindOfClass:[NSString class]]) {
+        return [NSString stringWithFormat:@"\"%@\"",object];
+    } else if ([object isKindOfClass:[NSNumber class]]) {
         return object;
     }
     
@@ -535,9 +537,8 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:REPLACE_INTO_ITEM_SQL, tableName];
     
     id jsonObject = [self generatedJsonWithObject:object];
-    if ([jsonObject isKindOfClass:[NSArray class]] || [jsonObject isKindOfClass:[NSDictionary class]]) {
-        NSData *data = [NSJSONSerialization dataWithJSONObject:jsonObject options:0 error:nil];
-        jsonObject = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if ([jsonObject isKindOfClass:[NSArray class]]) {
+        jsonObject = [NSString stringWithFormat:@"[%@]",[((NSArray *)jsonObject) componentsJoinedByString:@","]];
     } else {
         return NO;
     }
