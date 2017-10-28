@@ -53,18 +53,24 @@ static NSDictionary *getObjectData(id obj) {
     NSMutableDictionary *dic = [NSMutableDictionary dictionary];
     unsigned int propsCount;
     Class cls = [obj class];
+    if ([NSStringFromClass(cls) isEqualToString:NSStringFromClass([NSObject class])]) {
+        return dic;
+    }
     while (cls) {
-        objc_property_t *props = class_copyPropertyList(cls, &propsCount);
+        Ivar *ivars = class_copyIvarList(cls, &propsCount);
+        //        objc_property_t *props = class_copyPropertyList(cls, &propsCount);
         for(int i = 0;i < propsCount; i++) {
-            objc_property_t prop = props[i];
-            NSString *propName = [NSString stringWithUTF8String:property_getName(prop)];
-            id value = [obj valueForKey:propName];
+            //            objc_property_t prop = props[i];
+            Ivar ivar = ivars[i];
+            //            NSString *propName = [NSString stringWithUTF8String:property_getName(prop)];
+            NSString *ivarName = [NSString stringWithUTF8String:ivar_getName(ivar)];
+            id value = [obj valueForKey:ivarName];
             if(value) {
                 value = getObjectInternal(value);
-                [dic setObject:value forKey:propName];
+                [dic setObject:value forKey:[ivarName substringFromIndex:1]];
             }
         }
-        free(props);
+        free(ivars);
         cls = class_getSuperclass(cls);
         if ([NSStringFromClass(cls) isEqualToString:NSStringFromClass([NSObject class])]) {
             break;
