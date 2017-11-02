@@ -57,20 +57,26 @@ static NSDictionary *getObjectData(id obj) {
         return dic;
     }
     while (cls) {
-        Ivar *ivars = class_copyIvarList(cls, &propsCount);
-        //        objc_property_t *props = class_copyPropertyList(cls, &propsCount);
+        //Ivar *ivars = class_copyIvarList(cls, &propsCount);
+        objc_property_t *props = class_copyPropertyList(cls, &propsCount);
         for(int i = 0;i < propsCount; i++) {
-            //            objc_property_t prop = props[i];
-            Ivar ivar = ivars[i];
-            //            NSString *propName = [NSString stringWithUTF8String:property_getName(prop)];
-            NSString *ivarName = [NSString stringWithUTF8String:ivar_getName(ivar)];
-            id value = [obj valueForKey:ivarName];
+            objc_property_t prop = props[i];
+            //Ivar ivar = ivars[i];
+            NSString *propName = [NSString stringWithUTF8String:property_getName(prop)];
+            //NSString *ivarName = [NSString stringWithUTF8String:ivar_getName(ivar)];
+            if ([propName isEqualToString:@"superclass"] ||
+                [propName isEqualToString:@"debugDescription"] ||
+                [propName isEqualToString:@"hash"] ||
+                [propName isEqualToString:@"description"]) {
+                continue;
+            }
+            id value = [obj valueForKey:propName];
             if(value) {
                 value = getObjectInternal(value);
-                [dic setObject:value forKey:[ivarName substringFromIndex:1]];
+                [dic setObject:value forKey:propName];
             }
         }
-        free(ivars);
+        free(props);
         cls = class_getSuperclass(cls);
         if ([NSStringFromClass(cls) isEqualToString:NSStringFromClass([NSObject class])]) {
             break;
@@ -553,8 +559,6 @@ static ARStoreDBManager *_storeDBManager;
     id jsonObject = [self generatedJsonWithObject:object];
     if ([jsonObject isKindOfClass:[NSArray class]]) {
         jsonObject = [NSString stringWithFormat:@"[%@]",[((NSArray *)jsonObject) componentsJoinedByString:@","]];
-    } else {
-        return NO;
     }
     
     __block BOOL result;
