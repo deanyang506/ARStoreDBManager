@@ -71,6 +71,9 @@ static NSDictionary *getObjectData(id obj) {
                 continue;
             }
             id value = [obj valueForKey:propName];
+            if ([value isKindOfClass:[NSValue class]]) {
+                continue;
+            }
             if(value) {
                 value = getObjectInternal(value);
                 [dic setObject:value forKey:propName];
