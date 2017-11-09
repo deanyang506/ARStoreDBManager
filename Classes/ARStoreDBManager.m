@@ -71,7 +71,7 @@ static NSDictionary *getObjectData(id obj) {
                 continue;
             }
             id value = [obj valueForKey:propName];
-            if ([value isKindOfClass:[NSValue class]]) {
+            if ([NSStringFromClass([value class]) isEqualToString:@"NSConcreteValue"]) {
                 continue;
             }
             if(value) {
