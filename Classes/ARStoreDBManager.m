@@ -276,56 +276,57 @@ static ARStoreDBManager *_storeDBManager;
 - (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize comparison:(NSComparisonResult)comparison {
     NSCAssert(checkTableName(key),@"");
     
-    FMResultSet *resultSet = nil;
-    NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
-    pageIndex = MAX(0, pageIndex);
-    
-    if ([self isTableExists:key]) {
-        if (pageSize > 0) {
-            if (order == nil) {
-                resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize];
+    @synchronized(self) {
+        FMResultSet *resultSet = nil;
+        NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
+        pageIndex = MAX(0, pageIndex);
+        
+        if ([self isTableExists:key]) {
+            if (pageSize > 0) {
+                if (order == nil) {
+                    resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize];
+                } else {
+                    resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order];
+                }
             } else {
-                resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order];
+                if (order == nil) {
+                    resultSet = [self selectWithTableName:key];
+                } else {
+                    resultSet = [self selectWithTableName:key order:order];
+                }
             }
         } else {
-            if (order == nil) {
-                resultSet = [self selectWithTableName:key];
-            } else {
-                resultSet = [self selectWithTableName:key order:order];
-            }
-        }
-    } else {
-        resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
-    }
-    
-    if (resultSet) {
-        NSMutableArray *array = [NSMutableArray array];
-        while ([resultSet next]) {
-            ARStoreDBModel *item = [[ARStoreDBModel alloc] init];
-            item.identity = [resultSet stringForColumn:@"id"];
-            
-            NSString *json = [resultSet stringForColumn:@"json"];
-            NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
-            
-            NSError *error = nil;
-            id object = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
-            
-            if (error) {
-                item.object = json;
-            } else {
-                item.object = object;
-            }
-            
-            item.createdTime = [resultSet dateForColumn:@"createdTime"];
-            item.orderby = [resultSet stringForColumn:@"orderby"];
-            [array addObject:item];
+            resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
         }
         
-        [resultSet close];
-        
-        return [array copy];
+        if (resultSet) {
+            NSMutableArray *array = [NSMutableArray array];
+            while ([resultSet next]) {
+                ARStoreDBModel *item = [[ARStoreDBModel alloc] init];
+                item.identity = [resultSet stringForColumn:@"id"];
+                
+                NSString *json = [resultSet stringForColumn:@"json"];
+                NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+                
+                NSError *error = nil;
+                id object = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
+                
+                if (error) {
+                    item.object = json;
+                } else {
+                    item.object = object;
+                }
+                
+                item.createdTime = [resultSet dateForColumn:@"createdTime"];
+                item.orderby = [resultSet stringForColumn:@"orderby"];
+                [array addObject:item];
+            }
+            
+            [resultSet close];
+            
+            return [array copy];
+        }
     }
-    
     return nil;
 }
 
@@ -575,3 +576,4 @@ static ARStoreDBManager *_storeDBManager;
 
 
 @end
+
