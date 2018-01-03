@@ -34,7 +34,7 @@
  @result 成功/失败
  相同的key会被覆盖
  */
-- (BOOL)storeWithKey:(NSString *)key object:(id)object;
+- (BOOL)storeWithKey:(nonnull NSString *)key object:(id)object;
 
 
 /**
@@ -48,10 +48,10 @@
  @result 成功/失败，集合类型的某个失败将导致中断并返回失败
  注意：如果列表内已存储在相同的唯一标识将被覆盖
  */
-- (BOOL)setObjectWithKey:(NSString *)key
+- (BOOL)setObjectWithKey:(nonnull NSString *)key
                   object:(id)object
-             identityKey:(NSString *)identityKey
-                orderKey:(NSString *)orderkey;
+             identityKey:(nonnull NSString *)identityKey
+                orderKey:(nullable NSString *)orderkey;
 
 /**
  移除key列表中的单行或多行
@@ -59,14 +59,14 @@
  @identits 对应单行或多行的唯一标识, 如果为空则清除当前列表
  @result 成功/失败，包括key或identities不存在
  */
-- (BOOL)removeWithKey:(NSString *)key identities:(NSArray<__kindof NSString *> *)identities;
+- (BOOL)removeWithKey:(nonnull NSString *)key identities:(nullable NSArray<__kindof NSString *> *)identities;
 
 /**
  计算列表内所有记录数量
  @param key 列表名称
  @result 记录数量
  */
-- (NSUInteger)objectCountWithKey:(NSString *)key;
+- (NSUInteger)objectCountWithKey:(nonnull NSString *)key;
 
 
 /**
@@ -77,9 +77,19 @@
  @comparison 根据存储排序Key排序
  @result 集合
  */
-- (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key
+- (NSArray<ARStoreDBModel *> *)objectWithKey:(nonnull NSString *)key
                                    pageIndex:(NSInteger)pageIndex
                                     pageSize:(NSInteger)pageSize
                                   comparison:(NSComparisonResult)comparison;
 
+/**
+ 根据标识取出本地某行数据
+ 
+ @param key 列表名/默认表中的唯一key
+ @param identity 唯一标识的值 为nil时取出最后一行
+ @return 单行存储对象
+ */
+- (ARStoreDBModel *)objectWithKey:(nonnull NSString *)key identity:(nullable NSString *)identity;
+
 @end
+

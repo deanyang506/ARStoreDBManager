@@ -261,7 +261,7 @@ static ARStoreDBManager *_storeDBManager;
 
 - (NSUInteger)objectCountWithKey:(NSString *)key {
     
-    NSCAssert(checkTableName(key),@"");
+    NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询行记录数量）表名不能为nil");
     
     FMResultSet *resultSet = [self selectCountWithTableName:key];
     if ([resultSet next]) {
@@ -274,7 +274,7 @@ static ARStoreDBManager *_storeDBManager;
 }
 
 - (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize comparison:(NSComparisonResult)comparison {
-    NSCAssert(checkTableName(key),@"");
+    NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询记录）表名不能为nil");
     
     @synchronized(self) {
         FMResultSet *resultSet = nil;
@@ -302,23 +302,7 @@ static ARStoreDBManager *_storeDBManager;
         if (resultSet) {
             NSMutableArray *array = [NSMutableArray array];
             while ([resultSet next]) {
-                ARStoreDBModel *item = [[ARStoreDBModel alloc] init];
-                item.identity = [resultSet stringForColumn:@"id"];
-                
-                NSString *json = [resultSet stringForColumn:@"json"];
-                NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
-                
-                NSError *error = nil;
-                id object = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
-                
-                if (error) {
-                    item.object = json;
-                } else {
-                    item.object = object;
-                }
-                
-                item.createdTime = [resultSet dateForColumn:@"createdTime"];
-                item.orderby = [resultSet stringForColumn:@"orderby"];
+                ARStoreDBModel *item = [self analysisResultRow:resultSet];
                 [array addObject:item];
             }
             
@@ -330,8 +314,56 @@ static ARStoreDBManager *_storeDBManager;
     return nil;
 }
 
+- (ARStoreDBModel *)objectWithKey:(NSString *)key identity:(NSString *)identity {
+    NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询某行记录）表名不能为nil");
+    
+    @synchronized(self) {
+        FMResultSet *resultSet = nil;
+        if ([self isTableExists:key]) {
+            NSCAssert((identity.length),@"[ARStoreDBManager]（查询某行记录）唯一标识不能为nil");
+            resultSet = [self selectWithTableName:key whereId:identity];
+            
+        } else {
+            resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
+        }
+        
+        if (resultSet) {
+            ARStoreDBModel *item;
+            while ([resultSet next]) {
+                item = [self analysisResultRow:resultSet];
+                break;
+            }
+            [resultSet close];
+            return item;
+        }
+    }
+    
+    return nil;
+}
+
+- (ARStoreDBModel *)analysisResultRow:(FMResultSet *)resultSet {
+    ARStoreDBModel *item = [[ARStoreDBModel alloc] init];
+    item.identity = [resultSet stringForColumn:@"id"];
+    
+    NSString *json = [resultSet stringForColumn:@"json"];
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    
+    NSError *error = nil;
+    id object = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
+    
+    if (error) {
+        item.object = json;
+    } else {
+        item.object = object;
+    }
+    
+    item.createdTime = [resultSet dateForColumn:@"createdTime"];
+    item.orderby = [resultSet stringForColumn:@"orderby"];
+    return item;
+}
+
 - (BOOL)removeWithKey:(NSString *)key identities:(NSArray<__kindof NSString *> *)identities {
-    NSCAssert(checkTableName(key),@"");
+    NSCAssert(checkTableName(key),@"[ARStoreDBManager]（删除记录）表名不能为nil");
     
     if (identities.count == 0) {
         return [self clearTable:key];
@@ -349,7 +381,7 @@ static ARStoreDBManager *_storeDBManager;
 #pragma mark - private
 
 - (BOOL)createTableWithName:(NSString *)tableName {
-    NSCAssert(checkTableName(tableName),@"");
+    NSCAssert(checkTableName(tableName),@"[ARStoreDBManager]（创建表）表名不能为nil");
     
     NSString * sql = [NSString stringWithFormat:CREATE_TABLE_SQL, tableName];
     __block BOOL result;
@@ -361,7 +393,7 @@ static ARStoreDBManager *_storeDBManager;
 }
 
 - (BOOL)isTableExists:(NSString *)tableName {
-    NSCAssert(checkTableName(tableName),@"");
+    NSCAssert(checkTableName(tableName),@"[ARStoreDBManager]（检测表是否存在）表名不能为nil");
     
     __block BOOL result;
     [_dbQueue inDatabase:^(FMDatabase *db) {
