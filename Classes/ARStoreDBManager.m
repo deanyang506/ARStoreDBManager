@@ -277,38 +277,40 @@ static ARStoreDBManager *_storeDBManager;
     NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询记录）表名不能为nil");
     
     @synchronized(self) {
-        FMResultSet *resultSet = nil;
-        NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
-        pageIndex = MAX(0, pageIndex);
-        
-        if ([self isTableExists:key]) {
-            if (pageSize > 0) {
-                if (order == nil) {
-                    resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize];
+        @autoreleasepool {
+            FMResultSet *resultSet = nil;
+            NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
+            pageIndex = MAX(0, pageIndex);
+            
+            if ([self isTableExists:key]) {
+                if (pageSize > 0) {
+                    if (order == nil) {
+                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize];
+                    } else {
+                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order];
+                    }
                 } else {
-                    resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order];
+                    if (order == nil) {
+                        resultSet = [self selectWithTableName:key];
+                    } else {
+                        resultSet = [self selectWithTableName:key order:order];
+                    }
                 }
             } else {
-                if (order == nil) {
-                    resultSet = [self selectWithTableName:key];
-                } else {
-                    resultSet = [self selectWithTableName:key order:order];
+                resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
+            }
+            
+            if (resultSet) {
+                NSMutableArray *array = [NSMutableArray array];
+                while ([resultSet next]) {
+                    ARStoreDBModel *item = [self analysisResultRow:resultSet];
+                    [array addObject:item];
                 }
+                
+                [resultSet close];
+                
+                return [array copy];
             }
-        } else {
-            resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
-        }
-        
-        if (resultSet) {
-            NSMutableArray *array = [NSMutableArray array];
-            while ([resultSet next]) {
-                ARStoreDBModel *item = [self analysisResultRow:resultSet];
-                [array addObject:item];
-            }
-            
-            [resultSet close];
-            
-            return [array copy];
         }
     }
     return nil;
@@ -318,23 +320,25 @@ static ARStoreDBManager *_storeDBManager;
     NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询某行记录）表名不能为nil");
     
     @synchronized(self) {
-        FMResultSet *resultSet = nil;
-        if ([self isTableExists:key]) {
-            NSCAssert((identity.length),@"[ARStoreDBManager]（查询某行记录）唯一标识不能为nil");
-            resultSet = [self selectWithTableName:key whereId:identity];
-            
-        } else {
-            resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
-        }
-        
-        if (resultSet) {
-            ARStoreDBModel *item;
-            while ([resultSet next]) {
-                item = [self analysisResultRow:resultSet];
-                break;
+        @autoreleasepool {
+            FMResultSet *resultSet = nil;
+            if ([self isTableExists:key]) {
+                NSCAssert((identity.length),@"[ARStoreDBManager]（查询某行记录）唯一标识不能为nil");
+                resultSet = [self selectWithTableName:key whereId:identity];
+                
+            } else {
+                resultSet = [self selectWithTableName:DEFAULT_TABLE whereId:key];
             }
-            [resultSet close];
-            return item;
+            
+            if (resultSet) {
+                ARStoreDBModel *item;
+                while ([resultSet next]) {
+                    item = [self analysisResultRow:resultSet];
+                    break;
+                }
+                [resultSet close];
+                return item;
+            }
         }
     }
     
