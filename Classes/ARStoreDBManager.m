@@ -423,6 +423,9 @@ static ARStoreDBManager *_storeDBManager;
         }
         
         return [jsonArray copy];
+    } else if ([object isKindOfClass:[NSDictionary class]]) {
+        NSData *data = [NSJSONSerialization dataWithJSONObject:object options:0 error:nil];
+        return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     }
     
     id obj = getObjectData(object);
