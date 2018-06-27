@@ -26,10 +26,10 @@ static NSString *const INSERT_ITEM_SQL = @"INSERT INTO %@ (id, json, createdTime
 static NSString *const REPLACE_INTO_ITEM_SQL = @"REPLACE INTO %@ (id, json, createdTime, orderby) values (?, ?, ?, ?)";
 static NSString *const UPDATE_ITEM_SQL = @"UPDATE %@ SET json=?,orderby=? WHERE id=?";
 static NSString *const QUERY_ITEM_SQL = @"SELECT json, createdTime, orderby FROM %@ WHERE id = ? LIMIT 1";
-static NSString *const SELECT_ALL_SQL = @"SELECT * FROM %@";
-static NSString *const SELECT_ALL_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY orderby %@";
-static NSString *const SELECT_PAGE_SQL = @"SELECT * FROM %@ LIMIT %@ OFFSET %@";
-static NSString *const SELECT_PAGE_ORDERBY_SQL = @"SELECT * FROM %@ ORDER BY orderby %@ LIMIT %@ OFFSET %@";
+static NSString *const SELECT_ALL_SQL = @"SELECT * FROM %@ %@";
+static NSString *const SELECT_ALL_ORDERBY_SQL = @"SELECT * FROM %@ %@ ORDER BY orderby %@";
+static NSString *const SELECT_PAGE_SQL = @"SELECT * FROM %@ %@ LIMIT %@ OFFSET %@";
+static NSString *const SELECT_PAGE_ORDERBY_SQL = @"SELECT * FROM %@ %@ ORDER BY orderby %@ LIMIT %@ OFFSET %@";
 static NSString *const SELECT_ID_SQL = @"SELECT * FROM %@ WHERE id = ?";
 static NSString *const COUNT_ALL_SQL = @"SELECT COUNT(*) as num FROM %@";
 static NSString *const CLEAR_ALL_SQL = @"DELETE FROM %@";
@@ -274,6 +274,10 @@ static ARStoreDBManager *_storeDBManager;
 }
 
 - (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize comparison:(NSComparisonResult)comparison {
+    return [self objectWithKey:key pageIndex:pageIndex pageSize:pageSize comparison:comparison condition:nil];
+}
+
+- (NSArray<ARStoreDBModel *> *)objectWithKey:(NSString *)key pageIndex:(NSInteger)pageIndex pageSize:(NSInteger)pageSize comparison:(NSComparisonResult)comparison condition:(NSArray<NSString *> *)ids {
     NSCAssert(checkTableName(key),@"[ARStoreDBManager]（查询记录）表名不能为nil");
     
     @synchronized(self) {
@@ -282,18 +286,23 @@ static ARStoreDBManager *_storeDBManager;
             NSString *order = comparison == NSOrderedSame ? nil : (comparison == NSOrderedAscending ? @"ASC" : @"DESC");
             pageIndex = MAX(0, pageIndex);
             
+            NSString *condition;
+            if (ids.count) {
+                condition = [NSString stringWithFormat:@"id in ('%@')",[ids componentsJoinedByString:@"','"]];
+            }
+            
             if ([self isTableExists:key]) {
                 if (pageSize > 0) {
                     if (order == nil) {
-                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize];
+                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize condition:condition];
                     } else {
-                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order];
+                        resultSet = [self selectWithTableName:key size:pageSize offset:pageIndex * pageSize order:order condition:condition];
                     }
                 } else {
                     if (order == nil) {
-                        resultSet = [self selectWithTableName:key];
+                        resultSet = [self selectWithTableName:key condition:condition];
                     } else {
-                        resultSet = [self selectWithTableName:key order:order];
+                        resultSet = [self selectWithTableName:key order:order condition:condition];
                     }
                 }
             } else {
@@ -515,9 +524,10 @@ static ARStoreDBManager *_storeDBManager;
 
 #pragma mark - select
 
-- (FMResultSet *)selectWithTableName:(NSString *)tableName {
+- (FMResultSet *)selectWithTableName:(NSString *)tableName condition:(NSString *)condition {
     
-    NSString *sql = [NSString stringWithFormat:SELECT_ALL_SQL, tableName];
+    NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
+    NSString *sql = [NSString stringWithFormat:SELECT_ALL_SQL, tableName, where];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
@@ -527,8 +537,9 @@ static ARStoreDBManager *_storeDBManager;
     return resultSet;
 }
 
-- (FMResultSet *)selectWithTableName:(NSString *)tableName order:(NSString *)order {
+- (FMResultSet *)selectWithTableName:(NSString *)tableName order:(NSString *)order condition:(NSString *)condition {
     
+    NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
     NSString *sql = [NSString stringWithFormat:SELECT_ALL_ORDERBY_SQL, tableName, order];
     
     __block FMResultSet *resultSet;
@@ -541,9 +552,11 @@ static ARStoreDBManager *_storeDBManager;
 
 - (FMResultSet *)selectWithTableName:(NSString *)tableName
                                 size:(NSInteger)size
-                              offset:(NSUInteger)offset {
+                              offset:(NSUInteger)offset
+                            condition:(NSString *)condition {
     
-    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_SQL, tableName, @(size), @(offset)];
+    NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
+    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_SQL, tableName, where, @(size), @(offset)];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
@@ -556,9 +569,11 @@ static ARStoreDBManager *_storeDBManager;
 - (FMResultSet *)selectWithTableName:(NSString *)tableName
                                 size:(NSInteger)size
                               offset:(NSUInteger)offset
-                               order:(NSString *)order {
+                               order:(NSString *)order
+                           condition:(NSString *)condition {
     
-    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_ORDERBY_SQL, tableName, order, @(size), @(offset)];
+    NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
+    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_ORDERBY_SQL, tableName, condition, order, @(size), @(offset)];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {

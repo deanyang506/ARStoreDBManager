@@ -82,6 +82,22 @@
                                     pageSize:(NSInteger)pageSize
                                   comparison:(NSComparisonResult)comparison;
 
+
+/**
+ 取出本地存储对象
+ @param key 列表名称
+ @pageIndex 分页索引，可以结合pageSize 从第几条数据开始读取, 索引从0开始
+ @pageSize 每次取出多少条数据，如果为0则全部取出
+ @comparison 根据存储排序Key排序
+ @condition 根据ID集条件读取数据
+ @result 集合
+ */
+- (NSArray<ARStoreDBModel *> *)objectWithKey:(nonnull NSString *)key
+                                   pageIndex:(NSInteger)pageIndex
+                                    pageSize:(NSInteger)pageSize
+                                  comparison:(NSComparisonResult)comparison
+                                   condition:(NSArray<NSString *> *)ids;
+
 /**
  根据标识取出本地某行数据
  
