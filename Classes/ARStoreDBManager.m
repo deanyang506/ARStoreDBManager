@@ -540,7 +540,7 @@ static ARStoreDBManager *_storeDBManager;
 - (FMResultSet *)selectWithTableName:(NSString *)tableName order:(NSString *)order condition:(NSString *)condition {
     
     NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
-    NSString *sql = [NSString stringWithFormat:SELECT_ALL_ORDERBY_SQL, tableName, order];
+    NSString *sql = [NSString stringWithFormat:SELECT_ALL_ORDERBY_SQL, tableName, where, order];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
@@ -573,7 +573,7 @@ static ARStoreDBManager *_storeDBManager;
                            condition:(NSString *)condition {
     
     NSString *where = condition ? [NSString stringWithFormat:@"where %@",condition] : @"";
-    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_ORDERBY_SQL, tableName, condition, order, @(size), @(offset)];
+    NSString *sql = [NSString stringWithFormat:SELECT_PAGE_ORDERBY_SQL, tableName, where, order, @(size), @(offset)];
     
     __block FMResultSet *resultSet;
     [_dbQueue inDatabase:^(FMDatabase *db) {
