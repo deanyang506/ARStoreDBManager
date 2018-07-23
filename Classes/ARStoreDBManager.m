@@ -243,7 +243,7 @@ static ARStoreDBManager *_storeDBManager;
         
     } else {
         
-        NSString* identity = (NSString *)[object valueForKey:identityKey];
+        NSString* identity = (NSString *)[object valueForKeyPath:identityKey];
         if(identity == nil) {
             return NO;
         }
