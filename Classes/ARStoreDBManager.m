@@ -179,11 +179,7 @@ static ARStoreDBManager *_storeDBManager;
 }
 
 - (BOOL)setObjectWithKey:(NSString *)key object:(id)object identityKey:(NSString *)identityKey orderKey:(NSString *)orderkey {
-    
-    if (!identityKey) {
-        return NO;
-    }
-    
+
     if (![self isTableExists:key]) {
         if (![self createTableWithName:key]) {
             return NO;
