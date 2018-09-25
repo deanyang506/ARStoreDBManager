@@ -394,9 +394,11 @@ static ARStoreDBManager *_storeDBManager;
     
     NSString * sql = [NSString stringWithFormat:CREATE_TABLE_SQL, tableName];
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db executeUpdate:sql];
+        }];
+    }
     
     return result;
 }
@@ -405,10 +407,11 @@ static ARStoreDBManager *_storeDBManager;
     NSCAssert(checkTableName(tableName),@"[ARStoreDBManager]（检测表是否存在）表名不能为nil");
     
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db tableExists:tableName];
-    }];
-    
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db tableExists:tableName];
+        }];
+    }
     return result;
 }
 
@@ -452,26 +455,28 @@ static ARStoreDBManager *_storeDBManager;
     id jsonObject = [self generatedJsonWithObject:objects];
     
     __block BOOL result;
-    [_dbQueue inTransaction:^(FMDatabase *db, BOOL *rollback) {
-        if ([jsonObject isKindOfClass:[NSArray class]]) {
-            NSArray *jsonArray = (NSArray *)jsonObject;
-            for (int i = 0; i < jsonArray.count; i++) {
-                
-                NSString *order = [NSNull null];
-                if (orders.count > i) {
-                    order = orders[i];
+    @synchronized(self) {
+        [_dbQueue inTransaction:^(FMDatabase *db, BOOL *rollback) {
+            if ([jsonObject isKindOfClass:[NSArray class]]) {
+                NSArray *jsonArray = (NSArray *)jsonObject;
+                for (int i = 0; i < jsonArray.count; i++) {
+                    
+                    NSString *order = [NSNull null];
+                    if (orders.count > i) {
+                        order = orders[i];
+                    }
+                    
+                    result = [db executeUpdate:sql, identities[i], jsonArray[i], createdTime, order];
+                    if (!result) {
+                        *rollback = YES;
+                        return;
+                    }
                 }
-                
-                result = [db executeUpdate:sql, identities[i], jsonArray[i], createdTime, order];
-                if (!result) {
-                    *rollback = YES;
-                    return;
-                }
+            } else {
+                result = [db executeUpdate:sql, [identities firstObject], jsonObject, createdTime];
             }
-        } else {
-            result = [db executeUpdate:sql, [identities firstObject], jsonObject, createdTime];
-        }
-    }];
+        }];
+    }
     
     return result;
 }
@@ -483,9 +488,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:DELETE_ITEM_SQL, tableName];
     
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql,identity];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db executeUpdate:sql,identity];
+        }];
+    }
     
     return result;
 }
@@ -500,9 +507,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:DELETE_ITEMS_SQL, tableName,[identityArray componentsJoinedByString:@","]];
     
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db executeUpdate:sql];
+        }];
+    }
     
     return result;
 }
@@ -511,9 +520,11 @@ static ARStoreDBManager *_storeDBManager;
     
     NSString * sql = [NSString stringWithFormat:CLEAR_ALL_SQL, tableName];
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db executeUpdate:sql];
+        }];
+    }
     
     return result;
 }
@@ -526,9 +537,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:SELECT_ALL_SQL, tableName, where];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql];
+        }];
+    }
     
     return resultSet;
 }
@@ -539,9 +552,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:SELECT_ALL_ORDERBY_SQL, tableName, where, order];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql];
+        }];
+    }
     
     return resultSet;
 }
@@ -555,9 +570,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:SELECT_PAGE_SQL, tableName, where, @(size), @(offset)];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql];
+        }];
+    }
     
     return resultSet;
 }
@@ -572,9 +589,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:SELECT_PAGE_ORDERBY_SQL, tableName, where, order, @(size), @(offset)];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql];
+        }];
+    }
     
     return resultSet;
 }
@@ -584,9 +603,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:SELECT_ID_SQL, tableName];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql,whereId];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql,whereId];
+        }];
+    }
     
     return resultSet;
 }
@@ -596,9 +617,11 @@ static ARStoreDBManager *_storeDBManager;
     NSString *sql = [NSString stringWithFormat:COUNT_ALL_SQL, tableName];
     
     __block FMResultSet *resultSet;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        resultSet = [db executeQuery:sql];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            resultSet = [db executeQuery:sql];
+        }];
+    }
     
     return resultSet;
 }
@@ -615,10 +638,13 @@ static ARStoreDBManager *_storeDBManager;
         jsonObject = [NSString stringWithFormat:@"[%@]",[((NSArray *)jsonObject) componentsJoinedByString:@","]];
     }
     
+    
     __block BOOL result;
-    [_dbQueue inDatabase:^(FMDatabase *db) {
-        result = [db executeUpdate:sql,identity,jsonObject,createdTime, order];
-    }];
+    @synchronized(self) {
+        [_dbQueue inDatabase:^(FMDatabase *db) {
+            result = [db executeUpdate:sql,identity,jsonObject,createdTime, order];
+        }];
+    }
     
     return result;
 }
